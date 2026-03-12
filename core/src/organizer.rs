@@ -17,9 +17,29 @@ impl Organizer {
     pub fn new(config: Config) -> io::Result<Organizer> {
         let working_dir = &config.target;
 
+        // Collect known folder names from the mapping (e.g. "Documents", "Pictures")
+        // plus built-in folders. Only these top-level subdirectories are scanned.
+        let known_folders: HashSet<String> = config
+            .mapping
+            .values()
+            .cloned()
+            .chain(["Others".to_string(), "Duplicates".to_string()])
+            .collect();
+
         let mut files = Vec::new();
         for entry in WalkDir::new(working_dir)
             .into_iter()
+            .filter_entry(|e| {
+                if e.path() == working_dir.as_path() {
+                    return true;
+                }
+                // Skip any unrecognized directory at any depth
+                if e.file_type().is_dir() {
+                    let dir_name = e.file_name().to_string_lossy().to_string();
+                    return known_folders.contains(&dir_name);
+                }
+                true
+            })
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
         {
@@ -97,8 +117,27 @@ impl Organizer {
 
     /// Remove empty folders from the working directory.
     pub fn remove_empty_folders(&self) -> io::Result<()> {
-        let mut directories: Vec<_> = WalkDir::new(&self.config.target)
+        let known_folders: HashSet<String> = self
+            .config
+            .mapping
+            .values()
+            .cloned()
+            .chain(["Others".to_string(), "Duplicates".to_string()])
+            .collect();
+
+        let target = &self.config.target;
+        let mut directories: Vec<_> = WalkDir::new(target)
             .into_iter()
+            .filter_entry(|e| {
+                if e.path() == target.as_path() {
+                    return true;
+                }
+                if e.file_type().is_dir() {
+                    let dir_name = e.file_name().to_string_lossy().to_string();
+                    return known_folders.contains(&dir_name);
+                }
+                true
+            })
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.path().is_dir())
             .map(|entry| entry.into_path())
