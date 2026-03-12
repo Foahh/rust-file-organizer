@@ -3,6 +3,7 @@ use glob::Pattern;
 use log::info;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -17,7 +18,7 @@ impl FileEntry {
 
     /// Move the file to a new path.
     pub fn move_to(&mut self, new_path: &Path) -> Result<()> {
-        info!("Moving \"{}\" to \"{}\"", self.path(), new_path.display());
+        info!("Moving \"{}\" to \"{}\"", self.path.display(), new_path.display());
 
         let parent = new_path.parent().ok_or_else(|| {
             Error::Io(std::io::Error::new(
@@ -34,11 +35,11 @@ impl FileEntry {
     /// Check if the file is already sorted into the correct folder.
     pub fn is_sorted(&self, globs: &[String], mapping: &HashMap<String, String>) -> Result<bool> {
         if self.match_globs(globs)? {
-            info!("File \"{}\" is skipped", &self.path());
+            info!("File \"{}\" is skipped", self.path.display());
             return Ok(true);
         }
-        let dir_name = self.parent_path();
-        let ext = self.extension();
+        let dir_name = self.parent_path_lossy();
+        let ext = self.extension_lossy();
 
         // Try exact lookup first, then glob fallback for wildcard patterns (e.g. r0*, r1*)
         let target = mapping.get(&*ext).cloned().or_else(|| {
@@ -62,52 +63,53 @@ impl FileEntry {
         } else if dir_name.ends_with("Others") {
             return Ok(true);
         }
-        info!("File \"{}\" is not sorted", &self.path());
+        info!("File \"{}\" is not sorted", self.path.display());
         Ok(false)
     }
 
     /// Check if the file matches any of the given glob patterns.
     pub fn match_globs(&self, globs: &[String]) -> Result<bool> {
+        let path_str = self.path_lossy();
+        let name_str = self.file_name().to_string_lossy();
         for pattern in globs {
             let glob_pattern = Pattern::new(pattern)?;
-            if glob_pattern.matches(&self.path()) || glob_pattern.matches(&self.name()) {
+            if glob_pattern.matches(&path_str) || glob_pattern.matches(&name_str) {
                 return Ok(true);
             }
         }
         Ok(false)
     }
 
-    /// Get the parent path of the file.
-    pub fn parent_path(&self) -> Cow<'_, str> {
+    /// Get the parent path as a lossy string (for display and glob matching).
+    pub fn parent_path_lossy(&self) -> Cow<'_, str> {
         self.path
             .parent()
             .unwrap_or_else(|| Path::new(""))
             .to_string_lossy()
     }
 
-    /// Get the full path as a string.
-    pub fn path(&self) -> Cow<'_, str> {
+    /// Get the full path as a lossy string (for display and glob matching).
+    pub fn path_lossy(&self) -> Cow<'_, str> {
         self.path.to_string_lossy()
     }
 
-    /// Get the file name (with extension).
-    pub fn name(&self) -> Cow<'_, str> {
-        match self.path.file_name() {
-            Some(name) => name.to_string_lossy(),
-            None => Cow::Borrowed(""),
-        }
+    /// Get the file name as an OsStr (preserves non-UTF-8 bytes).
+    pub fn file_name(&self) -> &OsStr {
+        self.path.file_name().unwrap_or_default()
     }
 
-    /// Get the stem of the file name (without extension).
-    pub fn stem(&self) -> Cow<'_, str> {
-        match self.path.file_stem() {
-            Some(stem) => stem.to_string_lossy(),
-            None => Cow::Borrowed(""),
-        }
+    /// Get the stem of the file name as an OsStr (preserves non-UTF-8 bytes).
+    pub fn file_stem(&self) -> &OsStr {
+        self.path.file_stem().unwrap_or_default()
     }
 
-    /// Get the extension without the dot prefix (e.g. "pdf", not ".pdf").
-    pub fn extension(&self) -> Cow<'_, str> {
+    /// Get the extension as an OsStr (preserves non-UTF-8 bytes).
+    pub fn file_extension(&self) -> &OsStr {
+        self.path.extension().unwrap_or_default()
+    }
+
+    /// Get the extension as a lossy string (for HashMap lookups against UTF-8 config keys).
+    pub fn extension_lossy(&self) -> Cow<'_, str> {
         match self.path.extension() {
             Some(ext) => ext.to_string_lossy(),
             None => Cow::Borrowed(""),

@@ -5,6 +5,7 @@ use crate::utils::{generate_unique_filename, is_dir_empty, rapidhash_file_checks
 use glob::Pattern;
 use log::{error, info};
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fs;
 use walkdir::WalkDir;
 
@@ -52,8 +53,8 @@ impl Organizer {
                 Ok(false) => {}
             }
 
-            let file_name = file.name().to_string();
-            let ext = file.extension();
+            let file_name = file.file_name().to_owned();
+            let ext = file.extension_lossy();
 
             // Try exact HashMap lookup first
             let target_folder = self.config.mapping.get(&*ext).cloned().or_else(|| {
@@ -76,7 +77,7 @@ impl Organizer {
             };
 
             if let Err(e) = file.move_to(&new_path) {
-                error!("Failed to sort \"{}\": {}", file.path(), e);
+                error!("Failed to sort \"{}\": {}", file.path.display(), e);
                 errors.push(e);
             }
         }
@@ -184,8 +185,8 @@ impl Organizer {
                 return true;
             }
             if e.file_type().is_dir() {
-                let dir_name = e.file_name().to_string_lossy().to_string();
-                return known_folders.contains(&dir_name);
+                let dir_name = e.file_name();
+                return known_folders.iter().any(|f| OsStr::new(f) == dir_name);
             }
             true
         })

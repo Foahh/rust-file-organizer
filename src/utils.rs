@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::file_entry::FileEntry;
 use rapidhash::fast::RapidHasher;
+use std::ffi::OsString;
 use std::fs::File;
 use std::hash::Hasher;
 use std::io::{BufReader, Read};
@@ -15,15 +16,17 @@ pub fn is_dir_empty(dir: &Path) -> bool {
 }
 
 /// Generate a unique filename if the file already exists in the destination.
-pub fn generate_unique_filename(file: &FileEntry, target_dir: &Path) -> Result<String> {
-    let (stem, ext) = (file.stem(), file.extension());
+pub fn generate_unique_filename(file: &FileEntry, target_dir: &Path) -> Result<OsString> {
+    let stem = file.file_stem();
+    let ext = file.file_extension();
 
     for counter in 1.. {
-        let filename = if ext.is_empty() {
-            format!("{}_{}", stem, counter)
-        } else {
-            format!("{}_{}.{}", stem, counter, ext)
-        };
+        let mut filename = OsString::from(stem);
+        filename.push(format!("_{counter}"));
+        if !ext.is_empty() {
+            filename.push(".");
+            filename.push(ext);
+        }
         if !target_dir.join(&filename).exists() {
             return Ok(filename);
         }

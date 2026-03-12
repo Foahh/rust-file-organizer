@@ -3,26 +3,27 @@ use file_organizer::{Config, Organizer};
 use log::info;
 use log::LevelFilter::Info;
 use simple_logger::SimpleLogger;
+use std::path::PathBuf;
 use std::process;
 
-fn default_directory() -> String {
+fn default_directory() -> PathBuf {
     #[cfg(windows)]
     {
         if let Some(profile) = std::env::var_os("USERPROFILE") {
-            let downloads = std::path::PathBuf::from(profile).join("Downloads");
+            let downloads = PathBuf::from(profile).join("Downloads");
             if downloads.is_dir() {
-                return downloads.to_string_lossy().into_owned();
+                return downloads;
             }
         }
     }
-    String::new()
+    PathBuf::new()
 }
 
 #[derive(Parser)]
 struct Args {
     /// The target directory to operate on. Defaults to the user's Downloads folder on Windows.
-    #[arg(short, default_value_t = default_directory())]
-    directory: String,
+    #[arg(short, default_value_os_t = default_directory())]
+    directory: PathBuf,
 
     /// Path to the configuration file.
     #[arg(short, default_value = "rules.toml")]
@@ -53,7 +54,7 @@ fn main() {
 }
 
 fn run(args: Args) -> file_organizer::error::Result<()> {
-    if args.directory.is_empty() {
+    if args.directory.as_os_str().is_empty() {
         eprintln!("Error: no directory specified. Use -d <path> to set the target directory.");
         process::exit(1);
     }
