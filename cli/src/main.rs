@@ -1,7 +1,7 @@
 use clap::Parser;
-use log::info;
-use log::LevelFilter::Info;
 use file_organizer_core::{Config, Organizer};
+use log::LevelFilter::Info;
+use log::info;
 use simple_logger::SimpleLogger;
 use std::io::{self};
 
