@@ -1,7 +1,8 @@
+use crate::error::{Error, Result};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::PathBuf;
-use std::{fs, io};
 
 #[derive(Deserialize)]
 struct Rules {
@@ -13,53 +14,47 @@ pub struct Config {
     pub target: PathBuf,
     pub mapping: HashMap<String, String>,
     pub ignored: Vec<String>,
+    pub known_folders: HashSet<String>,
 }
 
 impl Config {
-    pub fn new(target: &str) -> Result<Self, io::Error> {
-        let path = PathBuf::from(target);
+    pub fn new(target: impl Into<PathBuf>, config_path: impl Into<PathBuf>) -> Result<Self> {
+        let target = target.into();
+        let config_path = config_path.into();
 
-        if !path.exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Directory {} does not exist", path.display()),
-            ));
+        if !target.exists() {
+            return Err(Error::DirectoryNotFound(target));
         }
 
-        let content = fs::read_to_string("rules.toml").map_err(|err| {
-            if err.kind() == io::ErrorKind::NotFound {
-                io::Error::new(
-                    io::ErrorKind::NotFound,
-                    "The 'rules.toml' file was not found. Please ensure the file exists in the current directory and is properly formatted.",
-                )
-            } else {
-                err
-            }
-        })?;
+        let content =
+            fs::read_to_string(&config_path).map_err(|_| Error::ConfigNotFound(config_path))?;
 
-        let rules: Rules = toml::from_str(&content).map_err(|e| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Failed to parse 'rules.toml': {}", e),
-            )
-        })?;
+        let rules: Rules = toml::from_str(&content)?;
 
         let mut mapping: HashMap<String, String> = HashMap::new();
         for (key, exts) in rules.mapping {
             for ext in exts {
-                let formatted_ext = if ext.starts_with('.') {
-                    ext
+                // Store without dot prefix — FileEntry::extension() returns bare extension
+                let bare_ext = if ext.starts_with('.') {
+                    ext[1..].to_string()
                 } else {
-                    format!(".{}", ext)
+                    ext
                 };
-                mapping.insert(formatted_ext, key.clone());
+                mapping.insert(bare_ext, key.clone());
             }
         }
 
+        let known_folders: HashSet<String> = mapping
+            .values()
+            .cloned()
+            .chain(["Others".to_string(), "Duplicates".to_string()])
+            .collect();
+
         Ok(Self {
-            target: path,
+            target,
             mapping,
             ignored: rules.ignore,
+            known_folders,
         })
     }
 }
