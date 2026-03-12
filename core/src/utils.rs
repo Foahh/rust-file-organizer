@@ -1,6 +1,7 @@
 use crate::file_entry::FileEntry;
-use crc::Crc;
+use rapidhash::RapidHasher;
 use std::fs::File;
+use std::hash::Hasher;
 use std::io::{BufReader, Error, Read};
 use std::path::Path;
 use std::{fs, io};
@@ -26,20 +27,18 @@ pub fn generate_unique_filename(file: &FileEntry, target_dir: &Path) -> io::Resu
     unreachable!()
 }
 
-/// Calculate the CRC64 checksum of a file.
-pub fn crc64_file_checksum(path: &Path) -> Result<String, Error> {
-    static CRC64_HASHER: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
-
+/// Calculate the rapidhash checksum of a file.
+pub fn rapidhash_file_checksum(path: &Path) -> Result<String, Error> {
     let mut reader = BufReader::new(File::open(path)?);
-    let mut digest = CRC64_HASHER.digest();
-    let mut buffer = [0; 1024];
+    let mut hasher = RapidHasher::default();
+    let mut buffer = [0; 8192];
 
     while let Ok(bytes_read) = reader.read(&mut buffer) {
         if bytes_read == 0 {
             break;
         }
-        digest.update(&buffer[..bytes_read]);
+        hasher.write(&buffer[..bytes_read]);
     }
 
-    Ok(format!("{:016x}", digest.finalize()))
+    Ok(format!("{:016x}", hasher.finish()))
 }

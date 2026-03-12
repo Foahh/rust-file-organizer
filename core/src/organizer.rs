@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::file_entry::FileEntry;
-use crate::utils::{crc64_file_checksum, generate_unique_filename, is_dir_empty};
+use crate::utils::{rapidhash_file_checksum, generate_unique_filename, is_dir_empty};
 use glob::Pattern;
 use log::error;
 use std::collections::HashSet;
@@ -102,7 +102,7 @@ impl Organizer {
                 continue;
             }
 
-            let hash = crc64_file_checksum(&file.path)?;
+            let hash = rapidhash_file_checksum(&file.path)?;
 
             if hash_set.contains(&hash) {
                 let new_filename = generate_unique_filename(&file, &duplicate_dir)?;
