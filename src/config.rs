@@ -35,8 +35,8 @@ impl Config {
         for (key, exts) in rules.mapping {
             for ext in exts {
                 // Store without dot prefix — FileEntry::extension() returns bare extension
-                let bare_ext = if ext.starts_with('.') {
-                    ext[1..].to_string()
+                let bare_ext = if let Some(stripped) = ext.strip_prefix('.') {
+                    stripped.to_string()
                 } else {
                     ext
                 };

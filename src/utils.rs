@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::file_entry::FileEntry;
-use rapidhash::RapidHasher;
+use rapidhash::fast::RapidHasher;
 use std::fs::File;
 use std::hash::Hasher;
 use std::io::{BufReader, Read};
@@ -11,7 +11,7 @@ use std::fs;
 pub fn is_dir_empty(dir: &Path) -> bool {
     fs::read_dir(dir)
         .ok()
-        .map_or(false, |mut entries| entries.next().is_none())
+        .is_some_and(|mut entries| entries.next().is_none())
 }
 
 /// Generate a unique filename if the file already exists in the destination.
