@@ -5,10 +5,23 @@ use log::LevelFilter::Info;
 use simple_logger::SimpleLogger;
 use std::process;
 
+fn default_directory() -> String {
+    #[cfg(windows)]
+    {
+        if let Some(profile) = std::env::var_os("USERPROFILE") {
+            let downloads = std::path::PathBuf::from(profile).join("Downloads");
+            if downloads.is_dir() {
+                return downloads.to_string_lossy().into_owned();
+            }
+        }
+    }
+    String::new()
+}
+
 #[derive(Parser)]
 struct Args {
-    /// The target directory to operate on.
-    #[arg(short)]
+    /// The target directory to operate on. Defaults to the user's Downloads folder on Windows.
+    #[arg(short, default_value_t = default_directory())]
     directory: String,
 
     /// Path to the configuration file.
@@ -40,6 +53,10 @@ fn main() {
 }
 
 fn run(args: Args) -> file_organizer::error::Result<()> {
+    if args.directory.is_empty() {
+        eprintln!("Error: no directory specified. Use -d <path> to set the target directory.");
+        process::exit(1);
+    }
     let config = Config::new(&args.directory, &args.config_path)?;
     let mut organizer = Organizer::new(config)?;
 
