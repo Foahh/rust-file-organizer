@@ -1,3 +1,15 @@
-[workspace]
-resolver = "2"
-members = ["core", "cli"]
+[package]
+name = "file-organizer"
+version = "1.0.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+glob = "0"
+log = "0"
+rapidhash = "4"
+serde = { version = "1", features = ["derive"] }
+simple_logger = "5"
+thiserror = "2"
+toml = "0"
+walkdir = "2"
